@@ -20,8 +20,10 @@ var (
 	// ***********************************************
 	// WEEKLY
 	// ***********************************************
+	// Note: Weekday is denoted as MO,TU,WE,TH,FR
+	//       Weekend is denoted as SA,SU
 	// rruleStr = "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR" // every weekday
-	rruleStr = "FREQ=WEEKLY;INTERVAL=4;BYDAY=SA,SU" // every other week on sat and sun
+	// rruleStr = "FREQ=WEEKLY;INTERVAL=4;BYDAY=SA,SU" // every other week on sat and sun (weekend)
 
 	// ***********************************************
 	// MONTHLY
@@ -29,14 +31,22 @@ var (
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1,2,3" // every month on the 1st, 2nd, and 3rd of the month
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=25" // every 3 months on the 25th of the month
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=1;BYDAY=MO,TU;BYSETPOS=1,2" // every month on the 1st and 2nd mon and tues of the month
-	// rruleStr = "FREQ=MONTHLY;INTERVAL=2;BYDAY=MO;BYSETPOS=3" // every other month on the 3rd mon of the month
+	rruleStr = "FREQ=MONTHLY;INTERVAL=2;BYDAY=MO;BYSETPOS=-1" // every other month on the 3rd mon of the month
+
+	// ***********************************************
+	// YEARLY
+	// ***********************************************
+	// rruleStr = "FREQ=YEARLY;INTERVAL=1;BYMONTH=1,2;BYMONTHDAY=1,2,3" // every year on the 1st, 2nd, and 3rd of Jan and Feb
+	// rruleStr = "FREQ=YEARLY;INTERVAL=2;BYMONTH=1;BYMONTHDAY=1" // every other year on Jan 1st
+	// rruleStr = "FREQ=YEARLY;INTERVAL=1;BYMONTH=1,2;BYDAY=MO;BYSETPOS=1,2" // every year on the 1st and 2nd Mon in Jan and Feb
+	// rruleStr = "FREQ=YEARLY;INTERVAL=2;BYMONTH=3;BYDAY=MO;BYSETPOS=3" // every other year on the 3rd Mon of Mar
 
 	startDate = time.Date(2022, 1, 20, 23, 59, 0, 0, time.UTC)
 	endDate   = time.Date(2023, 5, 30, 23, 59, 0, 0, time.UTC)
 	startTime = startDate.Format("15:04")
 
 	// rescheduleFreq defines how often we should reschedule interval calculations, it is used to calculate the rescheduleDate
-	// which is one second before the startDate + rescheduleFreq
+	// which is one second before the 1st of the month of startDate + rescheduleFreq
 	rescheduleFreq = rescheduleFrequency{
 		years:  1,
 		months: 0,
@@ -74,7 +84,8 @@ func main() {
 		panic(fmt.Sprintf("unsupported frequency [%s] in rrule [%s]", r.Options.Freq, r.String()))
 	}
 
-	if r.Options.Interval != 1 {
+	// INTERVAL>1
+	if r.Options.Interval > 1 {
 		if startDate.Before(time.Now()) {
 			startDate = time.Now()
 		}
@@ -126,45 +137,69 @@ func main() {
 		return
 	}
 
+	// INTERVAL=1
+	// Note: for WEEKLY and MONTHLY frequencies, there is no feasible way to support
+	// "last" ordering (eg. every year on the last Mon of Mar), ie. when BYSETPOS=-1 and INTERVAL=1
+	// Consider disabling allowing "last" in the UI when INTERVAL=1
 	switch r.Options.Freq {
 	case rrule.DAILY:
 		fmt.Printf("every day %s\n", startDate.Format("15:04"))
 	case rrule.WEEKLY:
-		var cronDayList []string
-		for _, day := range r.Options.Byweekday {
-			cronDayList = append(cronDayList, rruleWeekdayToCronWeekday[day])
-		}
-		fmt.Printf("every %s %s\n", strings.Join(cronDayList, ","), startTime)
-	case rrule.MONTHLY:
-		monthDayString := ""
-		var monthDayList []string
-		for _, monthDay := range r.Options.Bymonthday {
-			monthDayList = append(monthDayList, fmt.Sprint(monthDay))
-		}
-		if len(monthDayList) > 0 {
-			monthDayString = strings.Join(monthDayList, ",") + " "
-		}
-
-		setPosString := ""
-		var ordinalList []string
-		for _, setPos := range r.Options.Bysetpos {
-			ordinalList = append(ordinalList, ordinalize(setPos))
-		}
-		if len(ordinalList) > 0 {
-			setPosString = strings.Join(ordinalList, ",") + " "
-		}
-
-		cronDayString := ""
-		var cronDayList []string
-		for _, day := range r.Options.Byweekday {
-			cronDayList = append(cronDayList, rruleWeekdayToCronWeekday[day])
-		}
-		if len(cronDayList) > 0 {
-			cronDayString = strings.Join(cronDayList, ",") + " "
-		}
-
-		fmt.Printf("%s%s%sof month %s\n", monthDayString, setPosString, cronDayString, startTime)
+		fmt.Println(constructWeeklyString(r))
+	case rrule.MONTHLY, rrule.YEARLY:
+		fmt.Println(constructMonthlyAndYearlyString(r))
+	default:
+		panic(fmt.Sprintf("unsupported frequency [%s] in rrule [%s]", r.Options.Freq, r.String()))
 	}
+}
+
+func constructWeeklyString(r *rrule.RRule) string {
+	var cronDayList []string
+	for _, day := range r.Options.Byweekday {
+		cronDayList = append(cronDayList, rruleWeekdayToCronWeekday[day])
+	}
+
+	return fmt.Sprintf("every %s %s\n", strings.Join(cronDayList, ","), startTime)
+}
+
+func constructMonthlyAndYearlyString(r *rrule.RRule) string {
+	monthString := "month"
+	var monthList []string
+	for _, month := range r.Options.Bymonth {
+		monthList = append(monthList, time.Month(month).String()[:3])
+	}
+	if len(monthList) > 0 {
+		monthString = strings.Join(monthList, ",")
+	}
+
+	monthDayString := ""
+	var monthDayList []string
+	for _, monthDay := range r.Options.Bymonthday {
+		monthDayList = append(monthDayList, fmt.Sprint(monthDay))
+	}
+	if len(monthDayList) > 0 {
+		monthDayString = strings.Join(monthDayList, ",") + " "
+	}
+
+	setPosString := ""
+	var ordinalList []string
+	for _, setPos := range r.Options.Bysetpos {
+		ordinalList = append(ordinalList, ordinalize(setPos))
+	}
+	if len(ordinalList) > 0 {
+		setPosString = strings.Join(ordinalList, ",") + " "
+	}
+
+	cronDayString := ""
+	var cronDayList []string
+	for _, day := range r.Options.Byweekday {
+		cronDayList = append(cronDayList, rruleWeekdayToCronWeekday[day])
+	}
+	if len(cronDayList) > 0 {
+		cronDayString = strings.Join(cronDayList, ",") + " "
+	}
+
+	return fmt.Sprintf("%s%s%sof %s %s", monthDayString, setPosString, cronDayString, monthString, startTime)
 }
 
 func contains(s []rrule.Frequency, e rrule.Frequency) bool {
