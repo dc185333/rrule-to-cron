@@ -21,19 +21,27 @@ var (
 	// WEEKLY
 	// ***********************************************
 	// rruleStr = "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR" // every weekday
-	// rruleStr = "FREQ=WEEKLY;INTERVAL=2;BYDAY=SA,SU" // every other week on sat and sun
+	rruleStr = "FREQ=WEEKLY;INTERVAL=4;BYDAY=SA,SU" // every other week on sat and sun
 
 	// ***********************************************
 	// MONTHLY
 	// ***********************************************
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1,2,3" // every month on the 1st, 2nd, and 3rd of the month
-	rruleStr = "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=25" // every 3 months on the 25th of the month
+	// rruleStr = "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=25" // every 3 months on the 25th of the month
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=1;BYDAY=MO,TU;BYSETPOS=1,2" // every month on the 1st and 2nd mon and tues of the month
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=2;BYDAY=MO;BYSETPOS=3" // every other month on the 3rd mon of the month
 
-	startDate = time.Date(2021, 1, 4, 23, 59, 0, 0, time.UTC)
+	startDate = time.Date(2022, 1, 20, 23, 59, 0, 0, time.UTC)
 	endDate   = time.Date(2023, 5, 30, 23, 59, 0, 0, time.UTC)
 	startTime = startDate.Format("15:04")
+
+	// rescheduleFreq defines how often we should reschedule interval calculations, it is used to calculate the rescheduleDate
+	// which is one second before the startDate + rescheduleFreq
+	rescheduleFreq = rescheduleFrequency{
+		years:  1,
+		months: 0,
+		days:   0,
+	}
 
 	supportedFrequencies      = []rrule.Frequency{rrule.DAILY, rrule.WEEKLY, rrule.MONTHLY, rrule.YEARLY}
 	rruleWeekdayToCronWeekday = map[rrule.Weekday]string{
@@ -46,6 +54,10 @@ var (
 		rrule.SU: "sun",
 	}
 )
+
+type rescheduleFrequency struct {
+	years, months, days int
+}
 
 func main() {
 	fmt.Printf("RRULE:%s\n", rruleStr)
@@ -66,13 +78,13 @@ func main() {
 		if startDate.Before(time.Now()) {
 			startDate = time.Now()
 		}
-		// rescheduleDate is the last day of the month before 1 year from startDate and determines when we need
+		// rescheduleDate is the last day of the month before startDate + reschedFreq and determines when we need
 		// to recalculate the date list and create new schedulers
-		// eg. startDate = Nov 20 2021, endDate = Oct 31 2022
-		//     startDate = Jan 1 2021, endDate = Dec 31, 2021
+		// eg. startDate = Nov 20 2021, reschedulFre = 1 year, rescheduleDate = Oct 31 2022
+		//     startDate = Jan 1 2021, rescheduleFreq = 1 month, rescheduleDate = Jan 31, 2021
 		rescheduleDate := time.Date(
-			startDate.AddDate(1, 0, 0).Year(),
-			startDate.AddDate(1, 0, 0).Month(),
+			startDate.AddDate(rescheduleFreq.years, rescheduleFreq.months, rescheduleFreq.days).Year(),
+			startDate.AddDate(rescheduleFreq.years, rescheduleFreq.months, rescheduleFreq.days).Month(),
 			1, 0, 0, 0, 0, time.UTC).Add(-1 * time.Second)
 		if endDate.After(rescheduleDate) {
 			endDate = rescheduleDate
