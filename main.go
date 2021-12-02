@@ -23,7 +23,7 @@ var (
 	// Note: Weekday is denoted as MO,TU,WE,TH,FR
 	//       Weekend is denoted as SA,SU
 	// rruleStr = "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR" // every weekday
-	// rruleStr = "FREQ=WEEKLY;INTERVAL=4;BYDAY=SA,SU" // every other week on sat and sun (weekend)
+	// rruleStr = "FREQ=WEEKLY;INTERVAL=4;BYDAY=SA,SU" // every 4 weeks on sat and sun (weekend)
 
 	// ***********************************************
 	// MONTHLY
