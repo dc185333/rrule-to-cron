@@ -98,18 +98,29 @@ func main() {
 		)
 
 		frequencies := map[string][]string{}
-		var orderedMonth []string
+		var orderedMonthKeys []string
 		for _, date := range dates {
 			_, m, d := date.Date()
 			month := m.String()[:3]
 			if _, ok := frequencies[month]; !ok {
-				orderedMonth = append(orderedMonth, month)
+				orderedMonthKeys = append(orderedMonthKeys, month)
 			}
 			frequencies[month] = append(frequencies[month], fmt.Sprint(d))
 		}
 
-		for _, month := range orderedMonth {
-			fmt.Printf("%s of %s %s\n", strings.Join(frequencies[month], ","), month, startTime)
+		// uniqueDayList combines months with the same dayList
+		uniqueDayList := map[string][]string{}
+		var orderedUniqueDayListKeys []string
+		for _, month := range orderedMonthKeys {
+			dayList := strings.Join(frequencies[month], ",")
+			if _, ok := uniqueDayList[dayList]; !ok {
+				orderedUniqueDayListKeys = append(orderedUniqueDayListKeys, dayList)
+			}
+			uniqueDayList[dayList] = append(uniqueDayList[dayList], month)
+		}
+
+		for _, dayList := range orderedUniqueDayListKeys {
+			fmt.Printf("%s of %s %s\n", dayList, strings.Join(uniqueDayList[dayList], ","), startTime)
 		}
 
 		return
