@@ -14,7 +14,7 @@ var (
 	// ***********************************************
 	// DAILY
 	// ***********************************************
-	// rruleStr = "FREQ=DAILY;INTERVAL=1" // every day
+	rruleStr = "FREQ=DAILY;INTERVAL=1" // every day
 	// rruleStr = "FREQ=DAILY;INTERVAL=5" // every 5 days
 
 	// ***********************************************
@@ -31,7 +31,7 @@ var (
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1,2,3" // every month on the 1st, 2nd, and 3rd of the month
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=25" // every 3 months on the 25th of the month
 	// rruleStr = "FREQ=MONTHLY;INTERVAL=1;BYDAY=MO,TU;BYSETPOS=1,2" // every month on the 1st and 2nd mon and tues of the month
-	rruleStr = "FREQ=MONTHLY;INTERVAL=2;BYDAY=MO;BYSETPOS=-1" // every other month on the 3rd mon of the month
+	// rruleStr = "FREQ=MONTHLY;INTERVAL=2;BYDAY=MO;BYSETPOS=-1" // every other month on the last mon of the month
 
 	// ***********************************************
 	// YEARLY
@@ -41,8 +41,8 @@ var (
 	// rruleStr = "FREQ=YEARLY;INTERVAL=1;BYMONTH=1,2;BYDAY=MO;BYSETPOS=1,2" // every year on the 1st and 2nd Mon in Jan and Feb
 	// rruleStr = "FREQ=YEARLY;INTERVAL=2;BYMONTH=3;BYDAY=MO;BYSETPOS=3" // every other year on the 3rd Mon of Mar
 
-	startDate = time.Date(2022, 1, 20, 23, 59, 0, 0, time.UTC)
-	endDate   = time.Date(2023, 5, 30, 23, 59, 0, 0, time.UTC)
+	startDate = time.Date(2021, 11, 8, 23, 59, 0, 0, time.UTC)
+	endDate   = time.Date(2022, 12, 30, 23, 59, 0, 0, time.UTC)
 	startTime = startDate.Format("15:04")
 
 	// rescheduleFreq defines how often we should reschedule interval calculations, it is used to calculate the rescheduleDate
@@ -84,8 +84,8 @@ func main() {
 		panic(fmt.Sprintf("unsupported frequency [%s] in rrule [%s]", r.Options.Freq, r.String()))
 	}
 
-	// INTERVAL>1
-	if r.Options.Interval > 1 {
+	// INTERVAL>1 or BYSETPOS contains -1 (indicating "last" ordinal)
+	if r.Options.Interval > 1 || containsNegative(r.Options.Bysetpos) {
 		if startDate.Before(time.Now()) {
 			startDate = time.Now()
 		}
@@ -137,10 +137,7 @@ func main() {
 		return
 	}
 
-	// INTERVAL=1
-	// Note: for WEEKLY and MONTHLY frequencies, there is no feasible way to support
-	// "last" ordering (eg. every year on the last Mon of Mar), ie. when BYSETPOS=-1 and INTERVAL=1
-	// Consider disabling allowing "last" in the UI when INTERVAL=1
+	// INTERVAL=1 and BYSETPOS does not contain -1
 	switch r.Options.Freq {
 	case rrule.DAILY:
 		fmt.Printf("every day %s\n", startDate.Format("15:04"))
@@ -205,6 +202,15 @@ func constructMonthlyAndYearlyString(r *rrule.RRule) string {
 func contains(s []rrule.Frequency, e rrule.Frequency) bool {
 	for _, a := range s {
 		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func containsNegative(s []int) bool {
+	for _, v := range s {
+		if v == -1 {
 			return true
 		}
 	}
